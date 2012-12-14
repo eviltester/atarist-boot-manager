@@ -1,0 +1,906 @@
+#include "vt52.h"
+#include <stdio.h>
+
+void at(int row, int col)
+{
+	int r,c;
+	
+	r=32+row;
+	c=32+col;
+
+	printf("\033Y%c%c",r,c);
+}
+
+void set_defaults( void )
+{
+	int loop; 
+	
+	for(loop=0;loop<10;loop++)
+	{
+
+		resolutions[loop].rows=25;
+		resolutions[loop].columns=80;
+		resolutions[loop].progs_win=11;
+		resolutions[loop].other_win=3; 
+		resolutions[loop].progs_win_width=2;	
+		resolutions[loop].accs_win_width=3; 
+
+	}
+		resolutions[0].columns=40;
+
+	prog_defaults.resolution=Getrez();
+
+	if(prog_defaults.resolution>9)
+	{
+		BELL;
+		printf("WARNING A: Resolution greater than 9 found\n");
+		printf("using number 9 slot, better inform the ST\n");
+		printf("community\n");
+		BELL;
+		prog_defaults.resolution=9;
+	}
+
+	prog_defaults.rows=resolutions[prog_defaults.resolution].rows;
+	prog_defaults.columns=resolutions[prog_defaults.resolution].columns;
+	prog_defaults.progs_win=resolutions[prog_defaults.resolution].progs_win;
+	prog_defaults.other_win=resolutions[prog_defaults.resolution].other_win;
+	prog_defaults.progs_win_width=resolutions[prog_defaults.resolution].progs_win_width;
+	prog_defaults.accs_win_width=resolutions[prog_defaults.resolution].accs_win_width;
+
+
+	prog_defaults.bypass_time=10;
+	prog_defaults.bypass_key_high=3866624;	/* F1 */
+	prog_defaults.bypass_key_low=0x00;
+	strcpy( prog_defaults.auto_path , "C:\\AUTO" );
+	strcpy( prog_defaults.accs_path , "C:\\" );
+
+	/* KEYS */
+
+	prog_defaults.bypass_key_high=3866624; 	/* F1 */
+	prog_defaults.bypass_key_low=0x00;
+	strcpy(prog_defaults.bypass_key_text,"F1");
+
+	prog_defaults.abort_key_high=65563;			/* ESC */
+	prog_defaults.abort_key_low=0x00;
+	strcpy(prog_defaults.abort_key_text,"ESC");
+
+	prog_defaults.page_key_high=68747280;		/* CONTROL P */
+	prog_defaults.page_key_low=0x00;
+	strcpy(prog_defaults.page_key_text,"CTL P");
+
+	prog_defaults.toggle_key_high=3735584;		/* SPACE */
+	prog_defaults.toggle_key_low=0x00;
+	strcpy(prog_defaults.toggle_key_text,"SPACE");
+
+	prog_defaults.switch_key_high=983049;		/* TAB */
+	prog_defaults.switch_key_low=0x00;
+	strcpy(prog_defaults.switch_key_text,"TAB");
+
+	prog_defaults.help_key_high=6422528;		/* HELP */
+	prog_defaults.help_key_low=0x00;
+	strcpy(prog_defaults.help_key_text,"HELP");
+
+	prog_defaults.options_key_high=68681743;	/* CNTRL O */
+	prog_defaults.options_key_low=0x00;
+	strcpy(prog_defaults.options_key_text,"CTL O");
+
+	prog_defaults.new_key_high=5373952;			/* INS */
+	prog_defaults.new_key_low=0x00;
+	strcpy(prog_defaults.new_key_text,"INS");
+
+	prog_defaults.delete_key_high=5439615;		/* DELETE */
+	prog_defaults.delete_key_low=0x00;
+	strcpy(prog_defaults.delete_key_text,"DEL");
+
+
+	top_line_size=1;				/*title line*/
+	top_gap=0;				   	/* gap between title and windows */
+	mid_window_titles=2;			/* titles of windows */
+	mid_window_bottom=1;			/* bottom */
+	middle_gap=0;				/* gap between that and the other window*/
+	bot_window_title=1;
+	bot_window_bottom=1;
+	bottom_gap=0;
+	bottom_line_size=2;			/* size of bottom lines */
+
+	left_border=0;
+	right_border=0;
+	auto_accs_gap=0;
+	accs_sets_gap=0;
+
+}
+
+			
+void calculate_screen_sizes( void )
+{
+/*
+	int total_lines_used;
+	int screen_lines_used;
+	int defaults_lines_used;
+	int gaps;
+	int total_cols_used;
+
+re_check_height:
+
+	screen_lines_used=top_line_size+		/*title line*/
+							top_gap+				   	/* gap between title and windows */
+							mid_window_titles+		/* titles of windows */
+							mid_window_bottom+			/* bottom */
+							middle_gap+				/* gap between that and the other window*/
+							bot_window_title+
+							bot_window_bottom+
+							bottom_gap+
+							bottom_line_size;			/* size of bottom lines */
+
+
+	defaults_lines_used=	prog_defaults.progs_win+	/* size of progs win without titles etc */
+								prog_defaults.other_win; /* size of other win without titles etc */
+
+	total_lines_used=screen_lines_used + defaults_lines_used;
+	extra_lines=prog_defaults.rows-total_lines_used;
+
+	if(extra_lines != 0) /* gonna have to strip or pad */
+	{
+		/* first check for valid window sizes */
+		if(prog_defaults.progs_win<=0)
+			{
+				prog_defaults.progs_win=1;
+				goto re_check_height;
+			}
+
+		if(prog_defaults.other_win<=0)
+			{
+				prog_defaults.other_win=1;
+				goto re_check_height;
+			}
+
+		if(extra_lines > 0) /* gonna have to pad */
+		{
+
+			gaps=extra_lines;
+
+			/* increase the gaps */
+			while(gaps!=0)
+			{
+				if(gaps>=3)
+				{
+					bottom_gap++;
+					middle_gap++;
+					top_gap++;
+					gaps-=3;
+				}
+				else
+				{
+					if(gaps==2)
+					{
+						bottom_gap++;
+						top_gap++;
+						gaps-=2;
+					}
+					else		/* gaps is 1 */
+					{
+						middle_gap++;
+						gaps-=1;
+					}
+				}
+			}
+						
+		}
+		else
+		if(extra_lines < 0) /* gonna have to strip */
+		{
+			gaps=extra_lines*-1;
+	
+			
+			/* gaps means gaps needed, so first off reduce the gaps */ 
+			while(gaps!=0 &&( bottom_gap !=0 || middle_gap!=0 || top_gap!=0))
+			{
+				if(gaps>=3)
+				{
+					if(bottom_gap>0)
+						{
+						gaps--;
+						bottom_gap--;
+						}
+					if(middle_gap>0)
+						{
+						gaps--;
+						middle_gap--;
+						}
+					if(top_gap>0)
+						{
+						gaps--;
+						top_gap--;
+						}
+				}
+				else
+				{
+					if(gaps==2)
+					{
+						if(bottom_gap>0)
+							{
+							gaps--;
+							bottom_gap--;
+							}
+						if(top_gap>0)
+							{
+							gaps--;
+							top_gap--;
+							}
+						if(bottom_gap==0 && top_gap==0)
+							{
+								middle_gap--;
+								gaps--;
+							}	
+					}
+					else		/* gaps is 1 */
+					{
+						if(middle_gap>0)
+							{
+							middle_gap--;
+							gaps--;
+							}
+						if(middle_gap==0)
+							{
+							if(bottom_gap>0)
+								{
+								gaps--;
+								bottom_gap--;
+								}
+							if(top_gap>0)
+								{
+								gaps--;
+								top_gap--;
+								}
+							}
+					}
+				}
+			}
+
+			if(gaps!=0)		/* need to make more gaps */
+			{
+				/* reduce the windows sizes */
+
+				while(gaps!=0)
+				{
+					if((prog_defaults.progs_win%3)>prog_defaults.other_win)
+					{
+						prog_defaults.progs_win--;
+						gaps--;
+					}
+					else
+					{
+						prog_defaults.other_win--;
+						gaps--;
+					}
+				}
+	
+			}
+		}
+	}
+
+
+	title_row=0;
+	mid_window_title_row=top_line_size+top_gap;
+	mid_window_first_item_row=mid_window_title_row+mid_window_titles;
+	other_window_title_row=	mid_window_first_item_row+
+									prog_defaults.progs_win+
+									mid_window_bottom+
+									middle_gap;
+	other_window_first_item_row=other_window_title_row+
+										bot_window_title;
+	bottom_title_row=other_window_first_item_row+
+							prog_defaults.other_win+
+							bot_window_bottom+
+							bottom_gap;
+
+/*
+printf("TITLE ROW %d\n",title_row);
+printf("Top gap %d\n",top_gap);
+printf("middle gap %d\n",middle_gap);
+printf("bottom gap %d\n",bottom_gap);
+printf("mid window title %d\n",mid_window_title_row);
+printf("other window title ROW %d\n",other_window_title_row);
+printf("bottom TITLE ROW %d\n",bottom_title_row);
+getchar();
+*/
+
+
+
+/* now the widths and gaps calculations */
+
+re_check_width:
+
+	total_cols_used=((prog_defaults.progs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+(LINE_BORDER*2))+
+						((prog_defaults.accs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+(LINE_BORDER*2))+
+						 (SETS_NAME_SIZE+((ARROW_BORDER+LINE_BORDER)*2));
+
+	gaps=prog_defaults.columns-total_cols_used;
+
+	if(gaps!=0)		/* need to expand or contract */
+	{
+		if(gaps>0)	/* the easy one, need to expand */
+		{
+			while(gaps!=0)
+			{
+				if(gaps>=4)
+				{
+					left_border++;
+					right_border++;
+					auto_accs_gap++;
+					accs_sets_gap++;
+					gaps-=4;
+				}
+				else
+				{
+					if(gaps==3)
+					{
+						left_border++;
+						right_border++;
+						accs_sets_gap++;	
+						gaps-=3;	
+					}
+					else
+					{
+						if(gaps==2)
+						{
+							auto_accs_gap++;
+							accs_sets_gap++;
+							gaps-=2;
+						}
+						else
+						{
+							accs_sets_gap++;
+							gaps--;
+						}
+					}
+				}
+			}
+		}
+		else			/* the toughie, need to contract */
+		{
+
+			gaps=gaps*-1;
+
+			/* leave for now */
+			while(gaps!=0	&& (accs_sets_gap!=0 || left_border!=0 ||
+									 right_border!=0 || auto_accs_gap!=0))
+			{
+				if(gaps>=4)
+				{
+					if(left_border>0)
+						{
+						gaps--;
+						left_border--;
+						}
+					if(right_border>0)
+						{
+						gaps--;
+						right_border--;
+						}
+					if(auto_accs_gap>0)
+						{
+						gaps--;
+						auto_accs_gap--;
+						}
+					if(accs_sets_gap>0)
+						{
+						gaps--;
+						accs_sets_gap--;
+						}
+				}
+				else
+				{
+					if(gaps==3)
+					{
+					if(left_border>0)
+						{
+						gaps--;
+						left_border--;
+						}
+					if(right_border)
+						{
+						gaps--;
+						right_border--;
+						}
+					if(accs_sets_gap)
+						{
+						gaps--;
+						accs_sets_gap--;
+						}
+					if(left_border==0 && right_border==0 && accs_sets_gap==0)
+						{
+						gaps--;
+						auto_accs_gap--;
+						}
+					}
+					else
+					{
+						if(gaps==2)
+						{
+							if(auto_accs_gap>0)
+								{
+									gaps--;
+									auto_accs_gap--;
+								}
+							if(accs_sets_gap>0)
+								{
+									gaps--;
+									accs_sets_gap--;
+								}
+							if(accs_sets_gap==0 && auto_accs_gap==0)
+								{
+									if(left_border>0)
+									{
+										gaps--;
+										left_border--;
+									}
+									if(right_border>0)
+									{
+										gaps--;
+										right_border--;
+									}
+								}
+
+						}
+						else
+						{
+							if(accs_sets_gap>0)
+								{
+									gaps--;
+									accs_sets_gap--;
+								}
+							else
+								{
+									if(left_border>0)
+										{
+											gaps--;
+											left_border--;
+										}
+									if(right_border>0)
+										{
+											gaps--;
+											right_border--;
+										}
+									if(auto_accs_gap>0)
+										{
+											gaps--;
+											auto_accs_gap--;
+										}
+								}
+						}
+					}
+				}
+			}
+
+			if(gaps!=0)		/* oh no, gonna have to reduce sizes of windows */
+			{
+				if(prog_defaults.accs_win_width>1)
+					{
+						prog_defaults.accs_win_width--;		
+						goto re_check_width;
+					}
+				if(prog_defaults.progs_win_width>1)
+					{
+						prog_defaults.progs_win_width--;		
+						goto re_check_width;
+					}
+
+			}
+
+		}
+	}
+
+	auto_menu_col=left_border;
+	accs_menu_col=auto_menu_col+
+					(prog_defaults.progs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+
+					LINE_BORDER+
+					LINE_BORDER+
+					auto_accs_gap;
+	sets_menu_col=accs_menu_col+
+					(prog_defaults.accs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+
+					LINE_BORDER+
+					LINE_BORDER+
+					accs_sets_gap;
+
+
+	line_buffer=(char *)malloc(prog_defaults.columns+10);
+*/
+}
+	
+void auto_window( void )
+{
+/*
+	int width;
+	int loop;
+
+	width=(prog_defaults.progs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+
+					LINE_BORDER+
+					LINE_BORDER;
+
+	/* auto title */
+
+	centre_text("AUTO",line_buffer,width,' ');
+	at(mid_window_title_row,auto_menu_col);
+	printf("%s",line_buffer);
+
+	centre_text("XX/XX",line_buffer,width,'-');
+	at(mid_window_title_row+1,auto_menu_col);
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	printf("%s",line_buffer);
+
+	for(loop=0;loop<width;loop++)
+		line_buffer[loop]=' ';
+	line_buffer[loop]='\0';
+
+	line_buffer[0]='|';
+	line_buffer[width-1]='|';
+
+	for(loop=0;loop<prog_defaults.progs_win;loop++)
+	{
+		at(mid_window_first_item_row+loop,auto_menu_col);
+		printf("%s",line_buffer);
+	}
+
+	centre_text("--",line_buffer,width,'-');
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	at(mid_window_first_item_row+prog_defaults.progs_win,auto_menu_col);
+	printf("%s",line_buffer);
+*/
+}
+
+void accs_window( void )
+{
+/*
+	int width;
+	int loop;
+
+	width=(prog_defaults.accs_win_width*(PROG_NAME_SIZE+ARROW_BORDER))+ARROW_BORDER+
+					LINE_BORDER+
+					LINE_BORDER;
+
+	/* accs title */
+
+	centre_text("ACCS",line_buffer,width,' ');
+	at(mid_window_title_row,accs_menu_col);
+	printf("%s",line_buffer);
+
+	centre_text("XX/XX",line_buffer,width,'-');
+	at(mid_window_title_row+1,accs_menu_col);
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	printf("%s",line_buffer);
+
+	for(loop=0;loop<width;loop++)
+		line_buffer[loop]=' ';
+	line_buffer[loop]='\0';
+
+	line_buffer[0]='|';
+	line_buffer[width-1]='|';
+
+	for(loop=0;loop<prog_defaults.progs_win;loop++)
+	{
+		at(mid_window_first_item_row+loop,accs_menu_col);
+		printf("%s",line_buffer);
+	}
+
+	centre_text("--",line_buffer,width,'-');
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	at(mid_window_first_item_row+prog_defaults.progs_win,accs_menu_col);
+	printf("%s",line_buffer);
+*/
+}
+
+void sets_window( void )
+{
+/*
+	int width;
+	int loop;
+
+	width=SETS_NAME_SIZE+ARROW_BORDER+ARROW_BORDER+LINE_BORDER+
+					LINE_BORDER;
+
+	/* accs title */
+
+	centre_text("SETS",line_buffer,width,' ');
+	at(mid_window_title_row,sets_menu_col);
+	printf("%s",line_buffer);
+
+	centre_text("--",line_buffer,width,'-');
+	at(mid_window_title_row+1,sets_menu_col);
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	printf("%s",line_buffer);
+
+	for(loop=0;loop<width;loop++)
+		line_buffer[loop]=' ';
+	line_buffer[loop]='\0';
+
+	line_buffer[0]='|';
+	line_buffer[width-1]='|';
+
+	for(loop=0;loop<prog_defaults.progs_win;loop++)
+	{
+		at(mid_window_first_item_row+loop,sets_menu_col);
+		printf("%s",line_buffer);
+	}
+
+	centre_text("--",line_buffer,width,'-');
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	at(mid_window_first_item_row+prog_defaults.progs_win,sets_menu_col);
+	printf("%s",line_buffer);
+*/
+}
+
+void other_window( void )
+{
+/*
+	int width;
+	int loop;
+
+	width=prog_defaults.columns;
+
+	/* other title */
+
+	centre_text("OTHER",line_buffer,width,'-');
+	at(other_window_title_row,0);
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	printf("%s",line_buffer);
+
+	for(loop=0;loop<width;loop++)
+		line_buffer[loop]=' ';
+	line_buffer[loop]='\0';
+
+	line_buffer[0]='|';
+	line_buffer[width-1]='|';
+
+	for(loop=0;loop<prog_defaults.other_win;loop++)
+	{
+		at(other_window_first_item_row+loop,0);
+		printf("%s",line_buffer);
+	}
+
+	centre_text("--",line_buffer,width,'-');
+	line_buffer[0]='+';
+	line_buffer[width-1]='+';
+	at(other_window_first_item_row+prog_defaults.other_win,0);
+	printf("%s",line_buffer);
+*/
+}
+
+void draw_screen( void )
+{
+/*
+	CLEAR_SCREEN;
+	
+	DISCARD_EOL;
+
+	at(title_row,0);
+	REVERSE_VIDEO;
+	centre_text("ALs BOOTY",line_buffer,prog_defaults.columns,' ');
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+	auto_window();
+	
+	accs_window();
+
+	sets_window();
+
+	other_window();
+
+	at(bottom_title_row,0);
+	REVERSE_VIDEO;
+	centre_text("XXX",line_buffer,prog_defaults.columns,' ');
+	printf("%s",line_buffer);
+	at(bottom_title_row+1,0);
+	REVERSE_VIDEO;
+	centre_text("XXX",line_buffer,prog_defaults.columns,' ');
+	printf("%s",line_buffer);
+
+	NORMAL_VIDEO;
+	WRAP_EOL;
+*/
+}
+
+void centre_text(char *text_to_centre,char *centre_buffer, int width, char padding)
+{
+/*
+	int str_len=strlen(text_to_centre);
+	int before_spaces;
+	int after_spaces;
+	int loop;
+ 
+	before_spaces=(width/2)-((str_len/2)+(str_len%2));
+	after_spaces=(width-(width/2))-(str_len/2);
+
+	for(loop=0;loop<before_spaces;loop++)
+		centre_buffer[loop]=padding;
+
+	for(loop=0;loop<str_len;loop++)
+		centre_buffer[before_spaces+loop]=text_to_centre[loop];
+
+	for(loop=0;loop<after_spaces;loop++)
+		centre_buffer[before_spaces+str_len+loop]=padding;
+
+	centre_buffer[width]='\0';
+*/
+}
+	
+
+	
+
+
+void startup_screen( void )
+{
+/*
+	int secs;
+	int curr_sec,temp_sec;
+	clock_t tval2;
+
+
+	char sec_buff[6];
+
+	union{
+			long whole;
+			struct{
+						int upper;
+						int lower;
+					}split;
+			}key;
+
+
+	CLEAR_SCREEN;
+
+	centre_text("AL's BOOTY",line_buffer,prog_defaults.columns,' ');
+	
+	DISCARD_EOL;
+	at(title_row,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+	centre_text("PRESS THE BYPASS KEY TO QUIT",line_buffer,prog_defaults.columns,' ');
+	at(bottom_title_row,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+	centre_text("ANY OTHER KEY TO ENTER PROGRAM",line_buffer,prog_defaults.columns,' ');
+	at(bottom_title_row+1,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+	secs=prog_defaults.bypass_time;
+
+	tval2=clock();
+ 	curr_sec= tval2/CLK_TCK;
+	temp_sec=curr_sec;
+
+
+	while(!Bconstat(2) && (curr_sec<prog_defaults.bypass_time)) 
+	{
+		sprintf(sec_buff,"%d",secs);
+		centre_text(sec_buff,line_buffer,prog_defaults.columns,' ');
+		at(prog_defaults.rows/2,0);
+		NORMAL_VIDEO;
+		printf("%s",line_buffer);
+		NORMAL_VIDEO;
+
+		while(!Bconstat(2) && temp_sec==curr_sec)
+		{
+				tval2=clock();
+				temp_sec= tval2/CLK_TCK;
+		}
+		secs--;
+		curr_sec=temp_sec;
+	}
+
+	if(Bconstat(2))
+	{
+		key.whole=Bconin(2);
+
+		if(key.split.upper==prog_defaults.bypass_key_high &&
+			key.split.lower==prog_defaults.bypass_key_low)
+			exit(1);
+	}
+	else
+	{
+		exit(1);
+	}
+
+
+	WRAP_EOL;
+*/
+}
+
+
+void help_screen()
+{
+/*
+	CLEAR_SCREEN;
+
+	centre_text("HELP",line_buffer,prog_defaults.columns,' ');
+	
+	DISCARD_EOL;
+	at(title_row,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+
+	centre_text("PRESS ANY KEY TO RETURN TO",line_buffer,prog_defaults.columns,' ');
+	at(bottom_title_row,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+
+	centre_text(" THE MAIN PROGRAM",line_buffer,prog_defaults.columns,' ');
+	at(bottom_title_row+1,0);
+	REVERSE_VIDEO;
+	printf("%s",line_buffer);
+	NORMAL_VIDEO;
+*/
+}
+
+
+
+void main_loop()
+{
+/*
+	union{
+			long w;
+			struct{
+						int u;
+						int l;
+					}split;
+			}k;
+
+	k.w=0x00000000;
+
+	while(k.u!=prog_defaults.abort_key_high &&
+			k.l!=prog_defaults.abort_key_low)
+	{
+	
+		while(!Bconstat(2))
+			/*possibly update the clock here*/;
+
+		k.w=Bconin(2);
+
+		if(k.u==prog_defaults.options_key_high &&		/*OPTIONS SCREEN*/
+			k.l==prog_defaults.options_key_low)
+			{;
+			}		
+
+		if(k.u==prog_defaults.help_key_high &&		/*HELP SCREEN*/
+			k.l==prog_defaults.help_key_low)
+			{;
+			}		
+	}
+*/
+}
+
+
+void main()
+{
+/*
+
+	CLEAR_SCREEN;
+	set_defaults();
+	calculate_screen_sizes();
+	startup_screen();
+
+	draw_screen();
+	main_loop();
+	getchar();
+	
+
+	free(line_buffer);
+*/
+}

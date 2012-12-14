@@ -1,0 +1,22 @@
+
+from 	c.o
+
+i:\auto\vt52.o
+i:\auto\progs.o
+i:\auto\global.o
+i:\auto\display.o
+i:\auto\filelist.o
+i:\auto\edit.o
+i:\auto\defaults.o
+i:\auto\sets.o
+i:\auto\accs.o
+i:\auto\other.o
+i:\auto\options.o
+i:\auto\fileform.o
+
+LIBRARY lc.lib+lcm.lib
+VERBOSE
+XADDSYM
+
+to i:\auto\vt52.prg
+
